@@ -51,11 +51,8 @@
         const labels = tf.tensor2d(bOneHotVectors)
         const out = window.net.runNet(netInput)
 
-        const loss = tf.losses.softmaxCrossEntropy(
-          labels,
-          out,
-          tf.Reduction.MEAN
-        )
+        const loss = tf.losses.softmaxCrossEntropy(labels,out,tf.Reduction.MEAN)
+        //const loss = CustomCCCLoss(labels, out)
 
         return loss
       }, true)

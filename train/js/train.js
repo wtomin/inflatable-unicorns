@@ -1,3 +1,5 @@
+const tf = require('@tensorflow/tfjs');
+
 function save(epoch) {
   onEpochDone(
     epoch,
@@ -107,4 +109,36 @@ async function train() {
       }
     }
   }
+}
+
+function CustomCCCMetric(x, y){
+  /*def CCC_score(x, y):
+vx = x - np.mean(x)
+vy = y - np.mean(y)
+rho = np.sum(vx * vy) / (np.sqrt(np.sum(vx**2)) * np.sqrt(np.sum(vy**2)))
+x_m = np.mean(x)
+y_m = np.mean(y)
+x_s = np.std(x)
+y_s = np.std(y)
+ccc = 2*rho*x_s*y_s/(x_s**2 + y_s**2 + (x_m - y_m)**2)
+return ccc*/
+  return tf.tidy(() => {
+  const xvalue = tf.moments(x,[0]);
+  const yvalue = tf.moments(y, [0])
+  const xm = xvalue.mean;
+  const ym = yvalue.mean;
+  const xs =xvalue.variance.sqrt();
+  const ys = yvalue.variance.sqrt();
+  const vx = x - xm;
+  const vy = y - ym;
+  const rho = tf.div(tf.mul(vx, vy).sum(), tf.mul(vx.square().sum().sqrt(), vy.square().sum().sqrt()).add(tf.backend().epsilon()))
+  const ccc = tf.div(rho.mul(2).mul(xs).mul(ys), xvalue.variance.add(yvalue.variance).add(tf.sub(xm, ym).square()).add(tf.backend().epsilon()))
+  return ccc 
+  });
+}
+
+function CustomCCCLoss(x, y){
+  return tf.tidy(() => {
+    return tf.sub(1, CustomCCCMetric(x, y))
+    });
 }
