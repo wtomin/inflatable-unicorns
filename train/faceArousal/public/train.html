@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="tmp/face-api.js"></script>
+  <script src="FileSaver.js"></script>
+  <script src="commons.js"></script>
+  <script src="randomCrop.js"></script>
+  <script src="js/faceExpressionsCommons.js"></script>
+  <script src="train.js"></script>
+</head>
+<body>
+  <div id="container"></div>
+
+  <script>
+    tf = faceapi.tf
+
+    window.net = new faceapi.FaceArousalNet()
+
+    // uri to weights file of last checkpoint
+    const modelCheckpoint = 'tmp/initial_glorot.weights'
+    const startEpoch = 0
+    const endEpoch = 1
+    //const endEpoch = Infinity
+
+    const learningRate = 0.001
+    window.optimizer = tf.train.adam(learningRate, 0.9, 0.999, 1e-8)
+
+    window.saveEveryNthSample = Infinity
+
+    //window.batchSize = 8
+    window.batchSize = 32
+
+    window.lossValues = []
+
+    window.iterDelay = 0
+    window.withLogging = true
+    //window.displayProgress = true
+    window.withRandomCrop = true
+
+    async function load() {
+      window.trainData = (await faceapi.fetchJson('tmp/trainData.json'))
+
+      // fetch the actual output layer weights
+      const weights = await faceapi.fetchNetWeights(modelCheckpoint)
+      await window.net.load(weights)
+      window.net.faceFeatureExtractor.variable()
+      window.net.variable()
+    }
+
+    function computeLoss(netInput, batchData) {
+      return optimizer.minimize(() => {
+        const bLabels = batchData
+          .map(data => data.label)
+        const labels = tf.tensor1d(bLabels).reshape([-1, 1])
+        const out = window.net.runNet(netInput)
+        /*change the loss*/
+        const loss = tf.losses.meanSquaredError(
+          labels,
+          out,
+          tf.Reduction.MEAN
+        )
+
+        return loss
+      }, true)
+    }
+
+    train()
+  </script>
+</body>
+</html>
