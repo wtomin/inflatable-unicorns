@@ -15,7 +15,7 @@ function save(epoch) {
 async function train() {
   await load()
 
-  for (let epoch = startEpoch; epoch < Infinity; epoch++) {
+  for (let epoch = startEpoch; epoch < endEpoch; epoch++) {
 
     if (epoch !== startEpoch) {
       // ugly hack to wait for loss datas for that epoch to be resolved
