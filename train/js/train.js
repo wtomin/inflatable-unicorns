@@ -1,5 +1,3 @@
-const tf = require('@tensorflow/tfjs');
-
 function save(epoch) {
   onEpochDone(
     epoch,
@@ -17,7 +15,7 @@ function save(epoch) {
 async function train() {
   await load()
 
-  for (let epoch = startEpoch; epoch < endEpoch; epoch++) {
+  for (let epoch = startEpoch; epoch < endEpoch + 2; epoch++) {
 
     if (epoch !== startEpoch) {
       // ugly hack to wait for loss datas for that epoch to be resolved
@@ -27,7 +25,7 @@ async function train() {
       )
     }
     window.lossValues[epoch] = 0
-
+    
     const createBatches = window.createBatches || function(data, batchSize) {
       const shuffledInputs = prepareDataForEpoch(data)
       const batches = []
@@ -95,12 +93,12 @@ async function train() {
       loss.data().then(data => {
         const lossValue = data[0]
         window.lossValues[epoch] += lossValue
-        window.withLogging && log(`epoch ${epoch}, batchIdx ${batchIdx} - loss: ${lossValue}, ( ${window.lossValues[epoch]})`)
+        window.withLogging  && batchIdx%20==0 && log(`epoch ${epoch}, batchIdx ${batchIdx} - loss: ${lossValue}, ( ${window.lossValues[epoch]})`)
         loss.dispose()
-        window.displayProgress && window.displayProgress(epoch, batchIdx, batches.length, window.lossValues[epoch])
+        window.displayProgress && batchIdx%20==0 && window.displayProgress(epoch, batchIdx, batches.length, window.lossValues[epoch])
       })
 
-      window.withLogging && log(`epoch ${epoch}, batchIdx ${batchIdx} - backprop: ${tsBackward} ms, iter: ${Date.now() - tsIter} ms`)
+      window.withLogging && batchIdx%20==0 && log(`epoch ${epoch}, batchIdx ${batchIdx} - backprop: ${tsBackward} ms, iter: ${Date.now() - tsIter} ms`)
 
       if (window.iterDelay) {
         await delay(window.iterDelay)
@@ -109,36 +107,5 @@ async function train() {
       }
     }
   }
-}
-
-function CustomCCCMetric(x, y){
-  /*def CCC_score(x, y):
-vx = x - np.mean(x)
-vy = y - np.mean(y)
-rho = np.sum(vx * vy) / (np.sqrt(np.sum(vx**2)) * np.sqrt(np.sum(vy**2)))
-x_m = np.mean(x)
-y_m = np.mean(y)
-x_s = np.std(x)
-y_s = np.std(y)
-ccc = 2*rho*x_s*y_s/(x_s**2 + y_s**2 + (x_m - y_m)**2)
-return ccc*/
-  return tf.tidy(() => {
-  const xvalue = tf.moments(x,[0]);
-  const yvalue = tf.moments(y, [0])
-  const xm = xvalue.mean;
-  const ym = yvalue.mean;
-  const xs =xvalue.variance.sqrt();
-  const ys = yvalue.variance.sqrt();
-  const vx = x - xm;
-  const vy = y - ym;
-  const rho = tf.div(tf.mul(vx, vy).sum(), tf.mul(vx.square().sum().sqrt(), vy.square().sum().sqrt()).add(tf.backend().epsilon()))
-  const ccc = tf.div(rho.mul(2).mul(xs).mul(ys), xvalue.variance.add(yvalue.variance).add(tf.sub(xm, ym).square()).add(tf.backend().epsilon()))
-  return ccc 
-  });
-}
-
-function CustomCCCLoss(x, y){
-  return tf.tidy(() => {
-    return tf.sub(1, CustomCCCMetric(x, y))
-    });
+  //log(`training stops`)
 }

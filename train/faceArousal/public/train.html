@@ -19,7 +19,7 @@
     // uri to weights file of last checkpoint
     const modelCheckpoint = 'tmp/initial_glorot.weights'
     const startEpoch = 0
-    const endEpoch = 1
+    const endEpoch = 10
     //const endEpoch = Infinity
 
     const learningRate = 0.001
@@ -28,7 +28,7 @@
     window.saveEveryNthSample = Infinity
 
     //window.batchSize = 8
-    window.batchSize = 32
+    window.batchSize = 128
 
     window.lossValues = []
 
@@ -47,6 +47,42 @@
       window.net.variable()
     }
 
+    function CustomCCCMetric(x, y){
+      /*def CCC_score(x, y):
+    vx = x - np.mean(x)
+    vy = y - np.mean(y)
+    rho = np.sum(vx * vy) / (np.sqrt(np.sum(vx**2)) * np.sqrt(np.sum(vy**2)))
+    x_m = np.mean(x)
+    y_m = np.mean(y)
+    x_s = np.std(x)
+    y_s = np.std(y)
+    ccc = 2*rho*x_s*y_s/(x_s**2 + y_s**2 + (x_m - y_m)**2)
+    return ccc*/
+      return tf.tidy(() => {
+      //debugger;
+      const xvalue = tf.moments(x, [0]);
+      const yvalue = tf.moments(y, [0])
+      const xm = xvalue.mean;
+      const ym = yvalue.mean;
+      const xs = xvalue.variance.sqrt();
+      const ys = yvalue.variance.sqrt();
+      const vx = tf.sub(x, xm);
+      const vy = tf.sub(y, ym);
+      const num = tf.mul(vx, vy).sum();
+      const den = tf.mul(tf.square(vx).sum().sqrt(), tf.square(vy).sum().sqrt());
+      const rho = tf.div(num, tf.add(tf.backend().epsilon(), den));
+      //rho.print();
+      const ccc = tf.div(rho.mul(2).mul(xs).mul(ys), xvalue.variance.add(yvalue.variance).add(tf.sub(xm, ym).square()).add(tf.backend().epsilon()));
+      //ccc.print();
+      return ccc.asScalar()
+      });
+    }
+
+    function CustomCCCLoss(x, y){
+      return tf.tidy(() => {
+        return tf.sub(1, CustomCCCMetric(x, y))
+        });
+    }
     function computeLoss(netInput, batchData) {
       return optimizer.minimize(() => {
         const bLabels = batchData
@@ -54,16 +90,14 @@
         const labels = tf.tensor1d(bLabels).reshape([-1, 1])
         const out = window.net.runNet(netInput)
         /*change the loss*/
-        const loss = tf.losses.meanSquaredError(
-          labels,
-          out,
-          tf.Reduction.MEAN
-        )
+        //const loss = tf.losses.meanSquaredError(labels,out,tf.Reduction.MEAN)
+
+        const loss = CustomCCCLoss(labels, out)
 
         return loss
       }, true)
     }
-
+    //debugger;
     train()
   </script>
 </body>

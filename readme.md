@@ -22,16 +22,15 @@ Next, let's install `Nodejs` version 14.4.
 
 Simply run `nvm install 14.4.0`. Check its installation with `node --version`. If successful, you will see `v14.4.0`.
 
-Run the command below to tell Ubuntu that we want to install the Nodejs
-package from nodesource.
+Run the command below to tell Ubuntu that we want to install the Nodejs package from nodesource.
 ```
 curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
 ```
 
-Once we're done setting up Nodesource, we can now install Nodejs v14.4.
+Once we're done setting up Nodesource, we can now install Nodejs.
 Run `sudo apt-get install -y nodejs`.
 
-Simply type `nodejs -v` into your terminal and it should return v14.4.0.
+Simply type `nodejs -v` into your terminal and it should return v14.x version.
 
 You should have npm automatically installed at this point. To check what npm version you have, run `npm version`.
 
@@ -51,10 +50,10 @@ sudo docker pull justadudewhohacks/opencv-nodejs
 The `face-api.js` is not the same as the original implementation, but my forked repository. Run 
 
 ```
-git clone https://github.com/wtomin/face-api.js/tree/arousalNet
+git clone https://github.com/wtomin/face-api.js
 ```
 
-And store the face-api.js in the same directory as the `inflatable-unicorns`.
+And store the face-api.js in the same directory as the `inflatable-unicorns`. Then in the `face-api.js`, switch to another branch with `git checkout arousalNet`. 
 
 # Data Preparation
 
@@ -88,7 +87,7 @@ Next, run `export NODE_PATH=/usr/lib/node_modules` to help node find the install
 
 # Start the server
 
-In `train/public`, there is a typescript file `server.ts`. Firstly, we need to compile it to javascript, using:
+In `train/faceArousal/public`, there is a typescript file `server.ts`. Firstly, we need to compile it to javascript, using:
 
 ```
 tsc server.ts --target es5

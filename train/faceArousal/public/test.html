@@ -5,38 +5,43 @@
   <script src="FileSaver.js"></script>
   <script src="commons.js"></script>
   <script src="js/faceExpressionsCommons.js"></script>
-  <script src="js/test.js"></script>
+  
 </head>
 <body>
   <div id="container"></div>
 
   <script>
+    //debugger;
     tf = faceapi.tf
 
     window.numDataPerClass = Infinity
     window.iterDelay = 0
     window.withLogging = true
+    window.batchSize = 128
 
     // load the FaceLandmark68Net and use it's feature extractor since we only
     // train the output layer of the FaceExpressionNet
     window.net = new faceapi.FaceArousalNet()
 
     // uri to weights file of last checkpoint
-    window.modelCheckpoint = 'tmp/even-split/face_expression_model_2.weights'
+    window.modelCheckpoint = 'tmp/180k_samples/face_expression_model_7.weights'
 
     async function load() {
-      window.testData = await faceapi.fetchJson('tmp/testData.json')
+      window.testData = await faceapi.fetchJson('tmp/valData.json')
 
       // fetch the actual output layer weights
       const weights = await faceapi.fetchNetWeights(window.modelCheckpoint)
       await window.net.load(weights)
 
-      console.log('loaded')
+      console.log('loaded from ')
+      console.log(window.modelCheckpoint)
     }
 
     async function test() {
       await load()
-      let window.lossValues = 0
+      //let window.metricValues = 0
+      var epochLabels = []
+      var epochOutputs = []
       const createBatches = window.createBatches || function(data, batchSize) {
         const testInputs = prepareDataForTest(data)
         const batches = []
@@ -45,7 +50,7 @@
         }
         return batches
       }
-
+      let epoch = 0
       const batches = createBatches(window.testData, window.batchSize)
       console.log(batches)
       for (const [batchIdx, batchData] of batches.entries()) {
@@ -59,43 +64,88 @@
         let tsBackward = Date.now()
 
         const netInput = await faceapi.toNetInput(bImages)
-        const loss = computeLoss(netInput, batchData)
+        //const metric = computeMetric(netInput, batchData)
+        const batchLabels = getBatchLabels(batchData)
+        const batchOutputs = getBatchOutputs(netInput)
+        epochLabels.push(batchLabels)
+        epochOutputs.push(batchOutputs)
 
         tsBackward = Date.now() - tsBackward
 
-        // start next iteration without waiting for loss data
+        // start next iteration without waiting for metric data
 
-        loss.data().then(data => {
-          const lossValue = data[0]
-          window.lossValues += lossValue
-          window.withLogging && log(`epoch ${epoch}, batchIdx ${batchIdx} - loss: ${lossValue}, ( ${window.lossValues})`)
-          loss.dispose()
-          window.displayProgress && window.displayProgress(epoch, batchIdx, batches.length, window.lossValues)
-        })
+        // metric.data().then(data => {
+        //   const metricValue = data[0]
+        //   window.metricValues += metricValue
+        //   window.withLogging && log(`epoch ${epoch}, batchIdx ${batchIdx} - metric: ${metricValue}, ( ${window.metricValues})`)
+        //   metric.dispose()
+        //   window.displayProgress && window.displayProgress(epoch, batchIdx, batches.length, window.metricValues)
+        // })
 
-        window.withLogging && log(`epoch ${epoch}, batchIdx ${batchIdx} - backprop: ${tsBackward} ms, iter: ${Date.now() - tsIter} ms`)
+        window.withLogging && batchIdx%50==0 && log(`epoch ${epoch}, batchIdx ${batchIdx} - backprop: ${tsBackward} ms, iter: ${Date.now() - tsIter} ms`)
 
+        if (batchIdx == batches.length-1) {
+          const metricValues = computeMetric(tf.concat(epochOutputs), tf.concat(epochLabels))
+          metricValues.print()
+        } else {
+          //
+        }
         if (window.iterDelay) {
           await delay(window.iterDelay)
         } else {
           await tf.nextFrame()
         }
       }
+      
   }
+    function CustomCCCMetric(x, y){
+      /*def CCC_score(x, y):
+    vx = x - np.mean(x)
+    vy = y - np.mean(y)
+    rho = np.sum(vx * vy) / (np.sqrt(np.sum(vx**2)) * np.sqrt(np.sum(vy**2)))
+    x_m = np.mean(x)
+    y_m = np.mean(y)
+    x_s = np.std(x)
+    y_s = np.std(y)
+    ccc = 2*rho*x_s*y_s/(x_s**2 + y_s**2 + (x_m - y_m)**2)
+    return ccc*/
+      return tf.tidy(() => {
+      //debugger;
+      const xvalue = tf.moments(x, [0]);
+      const yvalue = tf.moments(y, [0])
+      const xm = xvalue.mean;
+      const ym = yvalue.mean;
+      const xs = xvalue.variance.sqrt();
+      const ys = yvalue.variance.sqrt();
+      const vx = tf.sub(x, xm);
+      const vy = tf.sub(y, ym);
+      const num = tf.mul(vx, vy).sum();
+      const den = tf.mul(tf.square(vx).sum().sqrt(), tf.square(vy).sum().sqrt());
+      const rho = tf.div(num, tf.add(tf.backend().epsilon(), den));
+      //rho.print();
+      const ccc = tf.div(rho.mul(2).mul(xs).mul(ys), xvalue.variance.add(yvalue.variance).add(tf.sub(xm, ym).square()).add(tf.backend().epsilon()));
+      //ccc.print();
+      return ccc.asScalar()
+      });
+    }
     // no optimizer in test script
-    function computeLoss(netInput, batchData) {
+    function computeMetric(out, labels) {
+      /*change the metric*/
+      const metric = CustomCCCMetric(
+        labels,
+        out)
+      return metric
+
+    }
+    function getBatchLabels(batchData) {
       const bLabels = batchData
         .map(data => data.label)
       const labels = tf.tensor1d(bLabels).reshape([-1, 1])
+      return labels
+    }
+    function getBatchOutputs(netInput){
       const out = window.net.runNet(netInput)
-      /*change the loss*/
-      const loss = tf.losses.meanSquaredError(
-        labels,
-        out,
-        tf.Reduction.MEAN
-      )
-      return loss
-
+      return out
     }
 
     function prepareDataForTest(data) {
@@ -107,7 +157,8 @@
         }).reduce((flat, arr) => arr.concat(flat))
       
     }
-
+    //debugger;
+    test()
   </script>
 
 </body>

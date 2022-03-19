@@ -94,7 +94,7 @@ function prepareDataForEpoch(data) {
         }
       }
 
-      return dataForLabelOut.slice(0, 4000)
+      return dataForLabelOut//.slice(0, 4000)
     }).reduce((flat, arr) => arr.concat(flat))
   )
 }
