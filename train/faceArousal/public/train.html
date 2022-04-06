@@ -13,17 +13,18 @@
 
   <script>
     tf = faceapi.tf
-
-    window.net = new faceapi.FaceArousalNet()
-
+    debugger;
+    window.net = new faceapi.ExtendedFaceArousalNet()
+    
     // uri to weights file of last checkpoint
-    const modelCheckpoint = 'tmp/initial_glorot.weights'
+    //const modelCheckpoint = 'tmp/front_init.weights'
+    const modelCheckpoint = 'tmp/extended_init.weights'
     const startEpoch = 0
     const endEpoch = 10
     //const endEpoch = Infinity
 
-    const learningRate = 0.001
-    window.optimizer = tf.train.adam(learningRate, 0.9, 0.999, 1e-8)
+    var learningRate = 0.001
+    window.optimizer = tf.train.adamax(learningRate, 0.9, 0.999, 1e-8)
 
     window.saveEveryNthSample = Infinity
 
@@ -93,6 +94,7 @@
         //const loss = tf.losses.meanSquaredError(labels,out,tf.Reduction.MEAN)
 
         const loss = CustomCCCLoss(labels, out)
+
 
         return loss
       }, true)

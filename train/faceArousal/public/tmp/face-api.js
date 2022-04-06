@@ -3195,6 +3195,158 @@
       return FaceArousalNet;
   }(FaceProcessor));
 
+  function extractParamsExtended(weights) {
+      var paramMappings = [];
+      var _a = extractWeightsFactory(weights), extractWeights = _a.extractWeights, getRemainingWeights = _a.getRemainingWeights;
+      var extractDenseBlock4Params = extractorsFactory(extractWeights, paramMappings).extractDenseBlock4Params;
+      var dense0 = extractDenseBlock4Params(3, 32, 'dense0', true);
+      var dense1 = extractDenseBlock4Params(32, 64, 'dense1');
+      var dense2 = extractDenseBlock4Params(64, 128, 'dense2');
+      var dense3 = extractDenseBlock4Params(128, 256, 'dense3');
+      var dense4 = extractDenseBlock4Params(256, 512, 'dense4', false);
+      if (getRemainingWeights().length !== 0) {
+          throw new Error("weights remaing after extract: " + getRemainingWeights().length);
+      }
+      return {
+          paramMappings: paramMappings,
+          params: { dense0: dense0, dense1: dense1, dense2: dense2, dense3: dense3, dense4: dense4 }
+      };
+  }
+
+  function extractParamsFromWeigthMapExtended(weightMap) {
+      var paramMappings = [];
+      var extractDenseBlock4Params = loadParamsFactory(weightMap, paramMappings).extractDenseBlock4Params;
+      var params = {
+          dense0: extractDenseBlock4Params('dense0', true),
+          dense1: extractDenseBlock4Params('dense1'),
+          dense2: extractDenseBlock4Params('dense2'),
+          dense3: extractDenseBlock4Params('dense3'),
+          dense4: extractDenseBlock4Params('dense4', false) // isfirstlayer=false, isScaleDown=False
+      };
+      disposeUnusedWeightTensors(weightMap, paramMappings);
+      return { params: params, paramMappings: paramMappings };
+  }
+
+  var ExtendedFaceFeatureExtractor = /** @class */ (function (_super) {
+      __extends(ExtendedFaceFeatureExtractor, _super);
+      function ExtendedFaceFeatureExtractor() {
+          return _super.call(this, 'ExtendedFaceFeatureExtractor') || this;
+      }
+      ExtendedFaceFeatureExtractor.prototype.forwardInput = function (input) {
+          var params = this.params;
+          if (!params) {
+              throw new Error('ExtendedFaceFeatureExtractor - load model before inference');
+          }
+          return Ze(function () {
+              var batchTensor = input.toBatchTensor(112, true);
+              var meanRgb = [122.782, 117.001, 104.298];
+              var normalized = normalize(batchTensor, meanRgb).div(On(255));
+              var out = denseBlock4(normalized, params.dense0, true);
+              out = denseBlock4(out, params.dense1);
+              out = denseBlock4(out, params.dense2);
+              out = denseBlock4(out, params.dense3);
+              out = denseBlock4(out, params.dense4, false, false); // an addition block 
+              out = fl(out, [7, 7], [2, 2], 'valid');
+              return out;
+          });
+      };
+      ExtendedFaceFeatureExtractor.prototype.forward = function (input) {
+          return __awaiter(this, void 0, void 0, function () {
+              var _a;
+              return __generator(this, function (_b) {
+                  switch (_b.label) {
+                      case 0:
+                          _a = this.forwardInput;
+                          return [4 /*yield*/, toNetInput(input)];
+                      case 1: return [2 /*return*/, _a.apply(this, [_b.sent()])];
+                  }
+              });
+          });
+      };
+      ExtendedFaceFeatureExtractor.prototype.getDefaultModelName = function () {
+          return 'face_feature_extractor_extended_model';
+      };
+      ExtendedFaceFeatureExtractor.prototype.extractParamsFromWeigthMap = function (weightMap) {
+          return extractParamsFromWeigthMapExtended(weightMap);
+      };
+      ExtendedFaceFeatureExtractor.prototype.extractParams = function (weights) {
+          return extractParamsExtended(weights);
+      };
+      return ExtendedFaceFeatureExtractor;
+  }(NeuralNetwork));
+
+  var ExtendedFaceArousalNet = /** @class */ (function (_super) {
+      __extends(ExtendedFaceArousalNet, _super);
+      function ExtendedFaceArousalNet(faceFeatureExtractor) {
+          if (faceFeatureExtractor === void 0) { faceFeatureExtractor = new ExtendedFaceFeatureExtractor(); }
+          return _super.call(this, 'ExtendedFaceArousalNet', faceFeatureExtractor) || this;
+      }
+      ExtendedFaceArousalNet.prototype.forwardInput = function (input) {
+          var _this = this;
+          return Ze(function () { return _this.runNet(input); });
+      };
+      ExtendedFaceArousalNet.prototype.forward = function (input) {
+          return __awaiter(this, void 0, void 0, function () {
+              var _a;
+              return __generator(this, function (_b) {
+                  switch (_b.label) {
+                      case 0:
+                          _a = this.forwardInput;
+                          return [4 /*yield*/, toNetInput(input)];
+                      case 1: return [2 /*return*/, _a.apply(this, [_b.sent()])];
+                  }
+              });
+          });
+      };
+      ExtendedFaceArousalNet.prototype.predictArousal = function (input) {
+          return __awaiter(this, void 0, void 0, function () {
+              var netInput, out, probabilitesByBatch, predictionsByBatch;
+              var _this = this;
+              return __generator(this, function (_a) {
+                  switch (_a.label) {
+                      case 0: return [4 /*yield*/, toNetInput(input)];
+                      case 1:
+                          netInput = _a.sent();
+                          return [4 /*yield*/, this.forwardInput(netInput)];
+                      case 2:
+                          out = _a.sent();
+                          return [4 /*yield*/, Promise.all(Ur(out).map(function (t) { return __awaiter(_this, void 0, void 0, function () {
+                                  var data;
+                                  return __generator(this, function (_a) {
+                                      switch (_a.label) {
+                                          case 0: return [4 /*yield*/, t.data()];
+                                          case 1:
+                                              data = _a.sent();
+                                              t.dispose();
+                                              return [2 /*return*/, data];
+                                      }
+                                  });
+                              }); }))];
+                      case 3:
+                          probabilitesByBatch = _a.sent();
+                          out.dispose();
+                          predictionsByBatch = probabilitesByBatch // no need to map to FaceExpressions
+                          ;
+                          //.map(probabilites => new FaceExpressions(probabilites as Float32Array))
+                          return [2 /*return*/, netInput.isBatchInput
+                                  ? predictionsByBatch
+                                  : predictionsByBatch[0]];
+                  }
+              });
+          });
+      };
+      ExtendedFaceArousalNet.prototype.getDefaultModelName = function () {
+          return 'face_arousal_model_extended';
+      };
+      ExtendedFaceArousalNet.prototype.getClassifierChannelsIn = function () {
+          return 512;
+      };
+      ExtendedFaceArousalNet.prototype.getClassifierChannelsOut = function () {
+          return 1;
+      };
+      return ExtendedFaceArousalNet;
+  }(FaceProcessor));
+
   var FaceLandmark68NetBase = /** @class */ (function (_super) {
       __extends(FaceLandmark68NetBase, _super);
       function FaceLandmark68NetBase() {
@@ -5713,6 +5865,8 @@
       faceLandmark68TinyNet: new FaceLandmark68TinyNet(),
       faceRecognitionNet: new FaceRecognitionNet(),
       faceExpressionNet: new FaceExpressionNet(),
+      faceArousalNet: new FaceArousalNet(),
+      faceArousalNetExtended: new ExtendedFaceArousalNet(),
       ageGenderNet: new AgeGenderNet()
   };
   /**
@@ -5792,7 +5946,28 @@
       return nets.faceRecognitionNet.computeFaceDescriptor(input);
   };
   /**
-   * Recognizes the facial expressions from a face image.
+   * Recognizes the arousal score from a face image.
+   *
+   * @param inputs The face image extracted from the bounding box of a face. Can
+   * also be an array of input images, which will be batch processed.
+   * @returns Arousal scores or array thereof in case of batch input.
+   */
+  var recognizeFaceArousal = function (input) {
+      return nets.faceArousalNet.predictArousal(input);
+  };
+  /**
+   * Recognizes the arousal score from a face image.
+   *
+   * @param inputs The face image extracted from the bounding box of a face. Can
+   * also be an array of input images, which will be batch processed.
+   * @returns Arousal scores or array thereof in case of batch input.
+   */
+  var recognizeFaceArousalExtended = function (input) {
+      return nets.faceArousalNetExtended.predictArousal(input);
+  };
+  /**
+   * Recognizes the facial expressions from a face image.ga
+   *
    *
    * @param inputs The face image extracted from the bounding box of a face. Can
    * also be an array of input images, which will be batch processed.
@@ -5819,6 +5994,8 @@
   var loadFaceLandmarkTinyModel = function (url) { return nets.faceLandmark68TinyNet.load(url); };
   var loadFaceRecognitionModel = function (url) { return nets.faceRecognitionNet.load(url); };
   var loadFaceExpressionModel = function (url) { return nets.faceExpressionNet.load(url); };
+  var loadFaceArousalModel = function (url) { return nets.faceArousalNet.load(url); };
+  var loadFaceArousalModelExtended = function (url) { return nets.faceArousalNetExtended.load(url); };
   var loadAgeGenderModel = function (url) { return nets.ageGenderNet.load(url); };
   // backward compatibility
   var loadFaceDetectionModel = loadSsdMobilenetv1Model;
@@ -6523,6 +6700,7 @@
   exports.DetectSingleFaceLandmarksTask = DetectSingleFaceLandmarksTask;
   exports.DetectSingleFaceTask = DetectSingleFaceTask;
   exports.Dimensions = Dimensions;
+  exports.ExtendedFaceArousalNet = ExtendedFaceArousalNet;
   exports.FACE_EXPRESSION_LABELS = FACE_EXPRESSION_LABELS;
   exports.FaceArousalNet = FaceArousalNet;
   exports.FaceDetection = FaceDetection;
@@ -6603,6 +6781,8 @@
   exports.isWithFaceLandmarks = isWithFaceLandmarks;
   exports.isWithGender = isWithGender;
   exports.loadAgeGenderModel = loadAgeGenderModel;
+  exports.loadFaceArousalModel = loadFaceArousalModel;
+  exports.loadFaceArousalModelExtended = loadFaceArousalModelExtended;
   exports.loadFaceDetectionModel = loadFaceDetectionModel;
   exports.loadFaceExpressionModel = loadFaceExpressionModel;
   exports.loadFaceLandmarkModel = loadFaceLandmarkModel;
@@ -6622,6 +6802,8 @@
   exports.normalize = normalize;
   exports.padToSquare = padToSquare;
   exports.predictAgeAndGender = predictAgeAndGender;
+  exports.recognizeFaceArousal = recognizeFaceArousal;
+  exports.recognizeFaceArousalExtended = recognizeFaceArousalExtended;
   exports.recognizeFaceExpressions = recognizeFaceExpressions;
   exports.resizeResults = resizeResults;
   exports.resolveInput = resolveInput;

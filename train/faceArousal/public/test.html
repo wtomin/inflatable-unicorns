@@ -24,7 +24,7 @@
     window.net = new faceapi.FaceArousalNet()
 
     // uri to weights file of last checkpoint
-    window.modelCheckpoint = 'tmp/180k_samples/face_expression_model_7.weights'
+    window.modelCheckpoint = 'tmp/adamax_lr=1e-4/face_expression_model_17.weights'
 
     async function load() {
       window.testData = await faceapi.fetchJson('tmp/valData.json')

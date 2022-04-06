@@ -92,11 +92,11 @@
 
     async function extendWeights() {
       const initializer = tf.initializers.glorotNormal()
+      //debugger;
+      const baseWeights = Array.from(new Float32Array(await (await fetch(`tmp/front_init.weights`)).arrayBuffer()))
 
-      const baseWeights = Array.from(new Float32Array(await (await fetch(`tmp/front.weights`)).arrayBuffer()))
-
-      const classifiersSize = (256 * 1) + 1 + (256 * 2) + 2 + (256 * 5) + 5
-      const front = baseWeights//.slice(0, baseWeights.length - classifiersSize)
+      const classifiersSize = (256 * 1) + 1 // + (256 * 2) + 2 + (256 * 5) + 5
+      const front = baseWeights.slice(0, baseWeights.length - classifiersSize)
 
       function initSeparableConvWeights(inChannels, outChannels) {
         return flatten(
@@ -131,14 +131,14 @@
           .map(toDataArray)
       )
       const outWeights = new Float32Array(front.concat(separableConvWeights).concat(fc))
-      saveAs(new Blob([outWeights]), `initial_glorot.weights`)
+      saveAs(new Blob([outWeights]), `extended_init.weights`)
     }
 
     function save() {
       const initialWeights = initWeights(
         tf.initializers.glorotNormal()
       )
-      saveAs(new Blob([initialWeights]), `initial_glorot.weights`)
+      saveAs(new Blob([initialWeights]), `front_init.weights`)
     }
 
   </script>
